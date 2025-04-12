@@ -1,0 +1,107 @@
+#----------------------------------------------------------------------------------------------------
+# PACKAGES
+#----------------------------------------------------------------------------------------------------
+
+using LinearAlgebra
+using JuMP
+using Plots
+using Mosek
+using MosekTools
+
+#----------------------------------------------------------------------------------------------------
+# GENERAL PARAMETERS AND DEFINITIONS
+#----------------------------------------------------------------------------------------------------
+
+d = 9
+γ = 1 / 2
+κ = 5
+ρ = 8
+ε = 0.01
+γ = 2
+
+P = binomial_distribution(d, 0.7)
+one = [1 for i = 1:d+1]
+
+C = distance_matrix(d)
+
+#----------------------------------------------------------------------------------------------------
+# GENERATE MODEL
+#----------------------------------------------------------------------------------------------------
+
+model = Model()
+set_optimizer(model, Mosek.Optimizer)
+set_silent(model)
+
+# define variables
+@variable(model, Q[1:d+1])
+@variable(model, Γ[1:d+1, 1:d+1])
+
+# define constarints
+@constraint(model, Q .≥ 0)
+@constraint(model, sum(Q) == 1)       
+     
+@constraint(model, Γ .≥ 0)
+@constraint(model, tr(C * Γ) - ε ≤ 0)
+@constraint(model, Γ * one .== P)
+@constraint(model, Γ' * one .== Q)
+
+print(model)
+
+#----------------------------------------------------------------------------------------------------
+
+for θ = 0:d
+    println("θ = ", θ)
+    X = (1/(d+1)) * ones(d+1)
+    optimal_value = f(θ, X)
+
+    for k = 0:9
+        # define objective
+        @objective(model, Max, (-2 * γ * (v(θ) * v(θ)') * X + γ * v(θ).^2 + v(θ))' * Q)
+
+        # solve 
+        optimize!(model)
+
+        S = value.(Q)
+
+        λ = 2 / (2 + k)
+        X = X + λ * (S - X)
+
+        println(f(θ, X) - optimal_value)
+        optimal_value = f(θ, X)
+        println(string("Iteration ", string(k+1), ": "), optimal_value)
+    end
+
+    println()
+end
+
+#----------------------------------------------------------------------------------------------------
+# ADDITIONAL FUNCTIONS
+#----------------------------------------------------------------------------------------------------
+
+function binomial_distribution(n, p)
+    return [binomial(n, i) * p^i * (1-p)^(d - i) for i = 0:d]
+end
+
+function L(θ, k)
+    return κ * θ - ρ * min(θ, k)
+end
+
+function v(θ)
+    return [L(θ, k) for k = 0:d]
+end
+
+function distance_matrix(d)
+    C = Matrix{Int64}(undef, d+1, d+1)
+
+    for i = 1:d+1
+        for j = 1:d+1
+            C[i, j] = abs(i - j)
+        end
+    end
+
+    return C
+end
+
+function f(θ, P)
+    return - γ * P' * (v(θ) * v(θ)') * P + (γ * v(θ) .^ 2 + v(θ))' * P
+end
