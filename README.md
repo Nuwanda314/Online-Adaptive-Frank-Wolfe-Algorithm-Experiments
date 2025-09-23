@@ -1,1 +1,1 @@
-# Adaptive-Frank-Wolfe-Algorithm-Experiments
+# Online Adaptive Frank-Wolfe Algorithm Experiments
