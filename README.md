@@ -1,1 +1,1 @@
-# Online Adaptive Frank-Wolfe Algorithm Experiments
+# An Online Domain and Objective Adaptive Frank-Wolfe Algorithm
